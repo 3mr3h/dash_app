@@ -12,6 +12,9 @@ from dash import dash_table
 
 import pandas as pd
 
+df_usd = pd.read_excel('final_buysell_preds.xls') # for usd calc
+end_capital = 0
+capital = 0
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
@@ -40,13 +43,26 @@ app.layout = html.Div(children=[
         multiple=True
     ),
     html.Div(dcc.Graph(id='Mygraph')),
-    html.H5("Input the amount you want to calculate KKM gain below:"),
-    html.Div(dcc.Input(id="input", placeholder="Input the amount", type="number", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'width':'200px', 'height':'40px'})),
-    html.H5("Gain from KKM for a three-month period:"),
-    html.P(id="output", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'borderRadius': '5px', 'width':'180px', 'height':'25px',  'vertical-align': 'middle', 'padding': '10px'}),
+    # KKM GAIN
+    html.H5("Capital Amount"),
+    html.Div(dcc.Input(id="input_kkm", placeholder=0, type="number", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'width':'200px', 'height':'40px'})),
+    
+    html.H5("KKM 3 Month Return:"),
+    html.P(id="output_kkm", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'borderRadius': '5px', 'width':'180px', 'height':'25px',  'vertical-align': 'middle', 'padding': '10px'}),
+    
+    # GAIN LOSS
+    html.H5("Yearly Inflation:"),
+    html.P(dcc.Input(id="interest_rate", placeholder=0, type="number", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'width':'200px', 'height':'40px'})),
+    html.H5("Capital gain/loss"),
+    html.P(id="output_GL", style={'background-color':'#F8F8F8','margin':'10px','border': '.6px', 'borderStyle':'solid', 'borderRadius': '5px', 'width':'180px', 'height':'25px',  'vertical-align': 'middle', 'padding': '10px'}),
+    
+    html.H5("Capital Gain/Loss margin"), # %5
+    html.Div(id='Output_capital'),
+    # Datagrid
     html.Div(id='output-data-upload')
 ])
 
+# dataset parsing
 def parse_data(contents, filename):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
@@ -65,18 +81,13 @@ def parse_data(contents, filename):
         return html.Div(['There was an error processing this file.'])
     return df
 
-def calc_gain(amount):
-    kkm = 0.14
-    kkm_m = 0.14 / 12
-    kkm_gain_m = amount * kkm_m #montly interest gain amount
-    gain_kkm_3m = amount + 3 * kkm_gain_m
-    return str(gain_kkm_3m)
-
+# figure for the input
 @app.callback(Output('Mygraph', 'figure'),
             [
                 Input('upload-data', 'contents'),
                 Input('upload-data', 'filename')
             ])
+
 def update_graph(contents, filename):
     fig = {
         'layout': go.Layout(
@@ -91,11 +102,32 @@ def update_graph(contents, filename):
         df = df.set_index(df.columns[0])
         fig = df.iplot(asFigure=True, kind='scatter', mode='lines+markers', size=1)
     return fig
-# gain return for kkm
-@app.callback(Output("output", "children"), [Input("input", "value")])
-def output_gain_kkm(value):
-    return calc_gain(value)
 
+# gain return for kkm
+@app.callback(Output("output_kkm", "children"), [Input("input_kkm", "value")])
+
+def output_gain_kkm(value):
+    capital = value
+    kkm = 0.14
+    if value is None:
+        return str(0)
+    else:
+        gain_kkm_3m = ((kkm/12*3)+1)*value
+        end_capital = gain_kkm_3m
+        return str(int(gain_kkm_3m))
+    
+# gain return for usd
+@app.callback(Output("output_GL", "children"), [Input("interest_rate", "value")])
+
+def output_gain_loss(value):
+    if value is None:
+        return str(0)
+    else:
+        quarterly_inf_rate = value/4
+        norm_capital = quarterly_inf_rate/100 * capital + capital
+        gain_loss = end_capital - norm_capital
+        #return str(gain_loss)
+        return end_capital
 
 @app.callback(Output('output-data-upload', 'children'),
             [
@@ -120,7 +152,8 @@ def update_table(contents, filename):
             html.Div('Raw Content'),
             html.Pre(contents[0:200] + '...', style={
                 'whiteSpace': 'pre-wrap',
-                'wordBreak': 'break-all'
+                'wordBreak': 'break-all',
+                'width':'%80'
             })
         ])
     return table
