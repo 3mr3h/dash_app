@@ -20,7 +20,7 @@ from dash import Dash, dash_table, html, dcc
 from dash.dependencies import Input, Output, State
 # Dataframe imports
 import pandas as pd
-df = pd.read_excel(r'DASHBOARDS\final_buysell_preds.xls')
+df = pd.read_excel(r'final_buysell_preds.xls')
 
 # External CSS for styling
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
